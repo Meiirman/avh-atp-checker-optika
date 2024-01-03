@@ -3,11 +3,18 @@ from methods.core import run_project
 import os
 from pathlib import Path
 
+from methods.methods import run_check_process
+
 
 def main(*args, **kwargs):
     """Запускает АТВ Генератор для B2B оптика"""
-    
-    run_project(*args, **kwargs)
+
+
+    # временно 
+    run_check_process()
+
+    # основное
+    # run_project(*args, **kwargs)
 
 
 

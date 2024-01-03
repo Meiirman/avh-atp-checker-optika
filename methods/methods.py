@@ -130,7 +130,7 @@ def run_check_process():
     # Получить ссылку на DOCX
 
     pdf_file = None
-    docx_files = None
+    docx_file = None
 
     folder_path = get_value("folder_path")
 
@@ -149,11 +149,11 @@ def run_check_process():
         if not pdf_file:
             send_message(
                 "Программа не нашел pdf файл у которого в названии есть слово 'АТП'",
-                "show_info",
+                "show_warnings",
             )
             return 0
     else:
-        send_message("В директории нет файлов PDF", "show_info")
+        send_message("В директории нет файлов PDF", "show_warnings")
         return 0
     
 
@@ -162,28 +162,70 @@ def run_check_process():
     if docx_files:
         for file in docx_files:
             if "заказ" in file.lower():
-                docx_files = folder_path + "/" + file
+                docx_file = folder_path + "/" + file
         if not docx_files:
             send_message(
                 "Программа не нашел docx файл у которого в названии есть слово 'Заказ'",
-                "show_info",
+                "show_warnings",
             )
             return 0
     else:
-        send_message("В директории нет файлов DOCX", "show_info")
+        send_message("В директории нет файлов DOCX", "show_warnings")
         return 0
         
 
     # 2. Спарсить PDF и сохранить в dict
+    # Временно закомментил, пока делаю docx
     pdf_data = parser_pdf.parse_pdf(pdf_file)
-    send_message(pdf_data["message"], "show_info")
+    send_message(pdf_data["message"], "show_notification")
 
     if not pdf_data["data"]:
         return 0
 
 
-    # 3. Спарсить HTML и сохранить в dict
-    # 4. Сверить и сохранить в dict
+    # 3. Спарсить docx и сохранить в dict
+    docx_data = parser_docx.parse_docx(docx_file)
+    send_message(docx_data["message"], "show_notification")
+
+    if not docx_data["data"]:
+        return 0
+
+
+    pdf_data = dict(pdf_data["data"])
+    docx_data = dict(docx_data["data"])
+    
+    # 4. Сверить и сохранить в list[dict]
+    results = []
+    for key in pdf_data:
+        current_sresult = {
+            "Номер ТЦП": key,
+            "Кол-во в заказе": None,
+            "Кол-во в АТП": pdf_data[key][1],
+            "Сумма": None,
+            "Комменты": "Нет в Заказе",
+        }
+        if docx_data.get(key, None) != None:
+            current_sresult["Кол-во в заказе"] = docx_data[key][1]
+            current_sresult["Сумма"] = docx_data[key][2]
+            current_sresult["Комменты"] = ""
+        
+        if current_sresult["Комменты"] == "":
+            if current_sresult["Кол-во в заказе"] != current_sresult["Кол-во в АТП"]:
+                current_sresult["Комменты"] = f"""Расхождение в количестве: 
+                в АТП: {current_sresult['Кол-во в АТП']}. В заказе: {current_sresult['Кол-во в заказе']}"""
+        results.append(current_sresult)
+    
+    for key in docx_data:
+        if pdf_data.get(key, None) == None:
+            current_sresult = {
+                "Номер ТЦП": key,
+                "Кол-во в заказе": docx_data[key][1],
+                "Кол-во в АТП": None,
+                "Сумма": docx_data[key][2],
+                "Комменты": "Нет в АТП",
+            }
+            results.append(current_sresult)
+
     # 5. Сгенерировать отчет в как АТП .docx формате
 
     return 0

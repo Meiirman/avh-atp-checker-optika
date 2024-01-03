@@ -1,129 +1,58 @@
-# import io
-# import os
-# import tempfile
-# import camelot
-# from camelot.core import TableList
-
-# def get_tables_from_pdf(bytes_io: io.BytesIO, line_scale: int) -> TableList | None:
-#     fd, path = tempfile.mkstemp(".pdf")
-#     with os.fdopen(fd, "wb") as temporary_file:
-#         temporary_file.write(bytes_io.read())
-#     try:
-#         table_list = camelot.read_pdf(
-#             path,
-#             pages="all",
-#             split_text=True,
-#             line_scale=line_scale,
-#             strip_text="\n",
-#         )
-#     except IndexError:
-#         return None
-#     os.remove(path)
-#     return table_list
+import tabula
+import pandas as pd
 
 
-# def get_tables_as_html_from_pdf(bytes_io: io.BytesIO, **kwargs) -> list[str] | None:
-#     table_list = get_tables_from_pdf(bytes_io, **kwargs)
-#     if table_list is None:
-#         return None
-#     tables = []
-#     for table in table_list:
-#         tables.append(
-#             table.df.to_html(
-#                 header=False, index=False, classes="table table-bordered", border=1
-#             )
-#         )
-#     return tables
+def get_table_data(tables):
+    print(tables[2])
+    print("tables[2]")
 
+    # Это кастыль который преобразует датаФрейм в строку и обратно делит его в двумерный массив. 
+    # Мне так нужно было сделать потому что он не читал первые элементы фрейма и так легче разделить каждый row по пробелам
+    table = [row.split() for row in "\n".join([f'-1 {table}' for table in tables]).split("\n")]
 
-# def file_to_bytes_io(pdf_file_path):
-#     with open(pdf_file_path, "rb") as file:
-#         pdf_bytes_io = io.BytesIO(file.read())
-#     return pdf_bytes_io
+    # Фитрую таблицу так что бы остались олько те в котором есть данные которые мне нужны
+    result = [
+        (float(row[1]), row[2], float(row[-2])) # [<номер строки>, <номер ТЦП>, <количество>]
+        for row in table
+        if "NaN" != row[1] # нам не нужно NaN
+        if len(row) >= 5  # Предотвращаем IndexError
+        if row[1].replace(".", "").isdigit() and row[-2].replace(".", "").isdigit() # Предотвращаем ValueError
+    ]
 
+    # Разделяем таблицу на части и получаем первую таблицу 
+    row_index = 1
+    table_index = -1
+    res = []
+    for row in result:
+        if row[0] == 1:
+            res.append([])
+            table_index += 1
+            row_index = 1
+        if row[0] == row_index:
+            res[table_index].append(row)
+            row_index += 1
 
-# def parse_pdf(pdf_file):
-#     tables: list[str] | None = get_tables_as_html_from_pdf(
-#         file_to_bytes_io(pdf_file), line_scale="54"
-#     )
-#     print(tables)
-
-# pdf_file_path = r"C:\Users\22186\Desktop\РабПапка\АТП г.Алматы, ул.Тулебаева, дом 125. Сектор А-24.pdf"
-# parsed_tables = parse_pdf(pdf_file_path)
-
-
-import io
-import os
-import tempfile
-from pathlib import Path
-
-import camelot
-import pdfplumber
-from camelot.core import TableList
-
-
-def get_tables_from_pdf_camelot(
-    bytes_io: io.BytesIO, line_scale: int
-) -> TableList | None:
-    fd, path = tempfile.mkstemp(".pdf")
-    with os.fdopen(fd, "wb") as temporary_file:
-        temporary_file.write(bytes_io.read())
-    try:
-        table_list = camelot.read_pdf(
-            path,
-            pages="all",
-            split_text=True,
-            line_scale=line_scale,
-            strip_text="\n",
-            ghostscript_path=gs_path
-        )
-    except IndexError:
-        return None
-    os.remove(path)
-    return table_list
-
-
-def get_tables_from_pdf_pdfplumber(bytes_io: io.BytesIO) -> list | None:
-    with pdfplumber.open(bytes_io) as pdf:
-        tables = []
-        for page in pdf.pages:
-            table = page.extract_tables()[0]
-            tables.append(table.df)
-    return tables
-
-
-def parse_pdf_camelot(pdf_file):
-    tables: TableList | None = get_tables_from_pdf_camelot(
-        file_to_bytes_io(pdf_file), line_scale=54
-    )
-    if tables is not None:
-        for i, table in enumerate(tables):
-            print(f"Table {i + 1}:")
-            print(table.df)
-            print()
-
-
-def parse_pdf_pdfplumber(pdf_file):
-    tables = get_tables_from_pdf_pdfplumber(file_to_bytes_io(pdf_file))
-    for i, table in enumerate(tables):
-        print(f"Table {i + 1}:")
-        print(table)
-        print()
-
-
-def file_to_bytes_io(pdf_file_path):
-    with open(pdf_file_path, "rb") as file:
-        pdf_bytes_io = io.BytesIO(file.read())
-    return pdf_bytes_io
+    rrr = []
+    for i in res[0]:
+        rrr.append(( i[1], (i[0], i[2]) ))
+    return rrr
 
 
 def parse_pdf(pdf_file):
-    pdf_file_path = pdf_file
-    parse_pdf_camelot(pdf_file_path)
-    parse_pdf_pdfplumber(pdf_file_path)
+    
+    pdf_path = pdf_file
+    tabula_options = {
+        'pandas_options': {'dtype': str}
+    }
+    tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True, **tabula_options)
 
 
-gs_path=r"C:\Users\22186\Desktop\WORK_FOLDER\1. DEV\avh-atp-checker-optika\static\gs10.02.1\bin\gswin32.exe"
-os.environ["PATH"] += os.pathsep + gs_path
-pdf_file_path = r"C:\Users\22186\Desktop\РабПапка\АТП г.Алматы, ул.Тулебаева, дом 125. Сектор А-24.pdf"
-parsed_tables = parse_pdf(pdf_file_path)
+
+    for i, df in enumerate(tables):
+        tables[i] = df.astype(str)
+
+    table = get_table_data(tables)
+
+    return {"message": "Успешно получил данные из PDF", "data": table}
+
+

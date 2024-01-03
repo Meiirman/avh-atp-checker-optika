@@ -1,8 +1,8 @@
 {
-  "show_notification": true,
+  "show_notification": false,
   "show_errors": true,
   "show_warnings": true,
-  "show_info": true,
+  "show_info": false,
   "show_debug": true,
   "learning_mode": true,
   "check_atp_order_button_visible": true,

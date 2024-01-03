@@ -8,13 +8,18 @@ from tkinter import filedialog, messagebox
 
 from models.model import AutoClosingWindow
 
+from . import atp, parser_pdf, parser_docx
+
+
 
 def get_value(parameter):
+    """Читает settings/config.json и возвращает значение по ключу parameter"""
+
     try:
-        with open("settings/config.json", "r") as f:
+        with open("settings/config.json", "r", encoding="utf-8") as f:
             data = json.load(f)
-            print(data)
-            print(data[parameter])
+            # print(data)
+            # print(data[parameter])
             return data[parameter]
     except:
         traceback.print_exc()
@@ -22,6 +27,12 @@ def get_value(parameter):
 
 
 def send_message(message, message_type, out_of_queue=False):
+    """Показывает сообщение в окне GUI\n
+    message - текст сообщения\n
+    message_type - тип сообщения (если в settings/config.json есть ключи show_notification, show_errors...)\n
+    out_of_queue - если True, то сообщение показывается в окне GUI в любом случае, а если False, то показывает только если в settings/config.json message_type имеет значение True
+    """
+
     print(message)
     if out_of_queue:
         root = tk.Tk()
@@ -62,16 +73,16 @@ def browse_folder(entry_var: tk.StringVar) -> None:
 
 def set_work_folder(folder_path: str):
     config_path = "settings/config.json"
-    
+
     try:
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         data = {}
 
     data["folder_path"] = folder_path
 
-    with open(config_path, "w") as f:
+    with open(config_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
     send_message(
@@ -79,21 +90,15 @@ def set_work_folder(folder_path: str):
     )
 
 
-def generate_b2b_excel():
-    pass
-
-
-def generate_b2b_html():
-    pass
-
-
 def change_excel_path(entry_var: tk.StringVar) -> None:
     excel_file_path = filedialog.askopenfilename(
         filetypes=[("Excel files", "*.xlsx;*.xls")]
     )
-    
+
     # Получить относительный путь
-    relative_path = pathlib.Path(excel_file_path).relative_to(pathlib.Path.cwd()).as_posix()
+    relative_path = (
+        pathlib.Path(excel_file_path).relative_to(pathlib.Path.cwd()).as_posix()
+    )
     # relative_path = os.path.relpath(excel_file_path, start=os.getcwd())
 
     entry_var.set(relative_path)
@@ -112,4 +117,73 @@ def change_excel_path(entry_var: tk.StringVar) -> None:
     with open(config_path, "w") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-    send_message('Новое местоположение Excel файла: "' + excel_path + '"', "show_info")
+    send_message(
+        'Новое местоположение Excel файла: "' + excel_path + '"',
+        "show_info",
+        message_type="show_info",
+    )
+
+
+def run_check_process():
+    # 1. Получить все нужные ссылки
+    # Получить ссылку на PDF
+    # Получить ссылку на DOCX
+
+    pdf_file = None
+    docx_files = None
+
+    folder_path = get_value("folder_path")
+
+    if folder_path in [None, False]:
+        send_message("Не задана рабочая папка", "show_errors")
+        return 1
+
+    files = os.listdir(folder_path)
+    
+    # Поиск в папке pdf-файлов
+    pdf_files = [file for file in files if file.lower().endswith(".pdf")]
+    if pdf_files:
+        for file in pdf_files:
+            if "атп" in file.lower():
+                pdf_file = folder_path + "/" + file
+        if not pdf_file:
+            send_message(
+                "Программа не нашел pdf файл у которого в названии есть слово 'АТП'",
+                "show_info",
+            )
+            return 0
+    else:
+        send_message("В директории нет файлов PDF", "show_info")
+        return 0
+    
+
+    # Поиск в папке docx-файлов
+    docx_files = [file for file in files if file.lower().endswith(".docx")]
+    if docx_files:
+        for file in docx_files:
+            if "заказ" in file.lower():
+                docx_files = folder_path + "/" + file
+        if not docx_files:
+            send_message(
+                "Программа не нашел docx файл у которого в названии есть слово 'Заказ'",
+                "show_info",
+            )
+            return 0
+    else:
+        send_message("В директории нет файлов DOCX", "show_info")
+        return 0
+        
+
+    # 2. Спарсить PDF и сохранить в dict
+    pdf_data = parser_pdf.parse_pdf(pdf_file)
+    send_message(pdf_data["message"], "show_info")
+
+    if not pdf_data["data"]:
+        return 0
+
+
+    # 3. Спарсить HTML и сохранить в dict
+    # 4. Сверить и сохранить в dict
+    # 5. Сгенерировать отчет в как АТП .docx формате
+
+    return 0

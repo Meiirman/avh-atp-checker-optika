@@ -4,14 +4,11 @@
   "show_warnings": true,
   "show_info": true,
   "show_debug": true,
-
   "learning_mode": true,
-
-  "generator_b2b_xlsx_button_visible" : true,
-  "generator_b2b_html_button_visible" : false,
-
-
+  "check_atp_order_button_visible": true,
+  
   "files_path_modification_access": false,
-  "prices_list_path": "static\\��� 188567.xlsx",
-  "folder_path": "C:/Users/22186/Desktop/��������"
+  "default_prices_list_path_in_folder_path": true,
+  "prices_list_path": "static/ТЦП 188567.xlsx",
+  "folder_path": "C:/Users/22186/Desktop/РабПапка"
 }
